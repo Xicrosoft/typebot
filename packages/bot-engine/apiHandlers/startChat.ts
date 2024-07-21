@@ -1,3 +1,5 @@
+import { BubbleBlockType } from '@typebot.io/schemas/features/blocks/bubbles/constants'
+import { Message } from '@typebot.io/schemas'
 import { computeCurrentProgress } from '../computeCurrentProgress'
 import { filterPotentiallySensitiveLogs } from '../logs/filterPotentiallySensitiveLogs'
 import { restartSession } from '../queries/restartSession'
@@ -6,12 +8,13 @@ import { startSession } from '../startSession'
 
 type Props = {
   origin: string | undefined
-  message?: string
+  message?: Message
   isOnlyRegistering: boolean
   publicId: string
   isStreamEnabled: boolean
   prefilledVariables?: Record<string, unknown>
   resultId?: string
+  textBubbleContentFormat: 'richText' | 'markdown'
 }
 
 export const startChat = async ({
@@ -22,6 +25,7 @@ export const startChat = async ({
   isStreamEnabled,
   prefilledVariables,
   resultId: startResultId,
+  textBubbleContentFormat,
 }: Props) => {
   const {
     typebot,
@@ -43,8 +47,9 @@ export const startChat = async ({
       publicId,
       prefilledVariables,
       resultId: startResultId,
+      textBubbleContentFormat,
+      message,
     },
-    message,
   })
 
   let corsOrigin
@@ -71,8 +76,11 @@ export const startChat = async ({
         clientSideActions,
         visitedEdges,
         setVariableHistory,
-        hasCustomEmbedBubble: messages.some(
-          (message) => message.type === 'custom-embed'
+        hasEmbedBubbleWithWaitEvent: messages.some(
+          (message) =>
+            message.type === 'custom-embed' ||
+            (message.type === BubbleBlockType.EMBED &&
+              message.content.waitForEvent?.isEnabled)
         ),
       })
 

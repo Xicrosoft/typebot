@@ -11,10 +11,11 @@ import {
   sessionOnlySetVariableOptions,
   valueTypes,
 } from '@typebot.io/schemas/features/blocks/logic/setVariable/constants'
-import { TextInput } from '@/components/inputs'
+import { TextInput, Textarea } from '@/components/inputs'
 import { isDefined } from '@typebot.io/lib'
 import { useTypebot } from '@/features/editor/providers/TypebotProvider'
 import { isInputBlock } from '@typebot.io/schemas/helpers'
+import { RadioButtons } from '@/components/inputs/RadioButtons'
 
 type Props = {
   options: SetVariableBlock['options']
@@ -131,6 +132,14 @@ const SetVariableValue = ({
       isExecutedOnClient,
     })
 
+  const updateListVariableId = (variable?: Pick<Variable, 'id'>) => {
+    if (!options || (options.type !== 'Pop' && options.type !== 'Shift')) return
+    onOptionsChange({
+      ...options,
+      saveItemInVariableId: variable?.id,
+    })
+  }
+
   const updateItemVariableId = (variable?: Pick<Variable, 'id'>) => {
     if (!options || options.type !== 'Map item with same index') return
     onOptionsChange({
@@ -172,6 +181,14 @@ const SetVariableValue = ({
     })
   }
 
+  const updateIsCode = (radio: 'Text' | 'Code') => {
+    if (options?.type && options.type !== 'Custom') return
+    onOptionsChange({
+      ...options,
+      isCode: radio === 'Code',
+    })
+  }
+
   switch (options?.type) {
     case 'Custom':
     case undefined:
@@ -186,12 +203,43 @@ const SetVariableValue = ({
             }
             onCheckChange={updateClientExecution}
           />
-          <CodeEditor
-            defaultValue={options?.expressionToEvaluate ?? ''}
-            onChange={updateExpression}
-            lang="javascript"
-          />
+          <Stack>
+            <RadioButtons
+              size="sm"
+              options={['Text', 'Code']}
+              defaultValue={
+                options?.isCode ?? defaultSetVariableOptions.isCode
+                  ? 'Code'
+                  : 'Text'
+              }
+              onSelect={updateIsCode}
+            />
+            {options?.isCode ? (
+              <CodeEditor
+                defaultValue={options?.expressionToEvaluate ?? ''}
+                onChange={updateExpression}
+                lang="javascript"
+              />
+            ) : (
+              <Textarea
+                defaultValue={options?.expressionToEvaluate ?? ''}
+                onChange={updateExpression}
+                width="full"
+              />
+            )}
+          </Stack>
         </>
+      )
+    case 'Pop':
+    case 'Shift':
+      return (
+        <VariableSearchInput
+          initialVariableId={options.saveItemInVariableId}
+          onSelectVariable={updateListVariableId}
+          placeholder={
+            options.type === 'Shift' ? 'Shifted item' : 'Popped item'
+          }
+        />
       )
     case 'Map item with same index': {
       return (
@@ -215,7 +263,7 @@ const SetVariableValue = ({
       )
     }
     case 'Append value(s)': {
-      return <TextInput defaultValue={options.item} onChange={updateItem} />
+      return <Textarea defaultValue={options.item} onChange={updateItem} />
     }
     case 'Moment of the day': {
       return (

@@ -15,6 +15,8 @@ export const valueTypes = [
   'Random ID',
   'Moment of the day',
   'Map item with same index',
+  'Pop',
+  'Shift',
   'Phone number',
   'Contact name',
 ] as const
@@ -26,4 +28,5 @@ export const sessionOnlySetVariableOptions = ['Transcript'] as const
 export const defaultSetVariableOptions = {
   type: 'Custom',
   isExecutedOnClient: false,
+  isCode: false,
 } as const satisfies SetVariableBlock['options']

@@ -3,7 +3,7 @@ import { ChatCompletionOpenAIOptions } from '@typebot.io/schemas/features/blocks
 import { OpenAI } from 'openai'
 import { decryptV2 } from '@typebot.io/lib/api/encryption/decryptV2'
 import { forgedBlocks } from '@typebot.io/forge-repository/definitions'
-import { VariableStore } from '@typebot.io/forge'
+import { AsyncVariableStore } from '@typebot.io/forge'
 import {
   ParseVariablesOptions,
   parseVariables,
@@ -23,7 +23,14 @@ type Props = {
   messages: OpenAI.Chat.ChatCompletionMessage[] | undefined
 }
 
-export const getMessageStream = async ({ sessionId, messages }: Props) => {
+export const getMessageStream = async ({
+  sessionId,
+  messages,
+}: Props): Promise<{
+  stream?: ReadableStream<any>
+  status?: number
+  message?: string
+}> => {
   const session = await getSession(sessionId)
 
   if (!session?.state || !session.state.currentBlockId)
@@ -97,7 +104,7 @@ export const getMessageStream = async ({ sessionId, messages }: Props) => {
       credentials.iv
     )
 
-    const variables: VariableStore = {
+    const variables: AsyncVariableStore = {
       list: () => session.state.typebotsQueue[0].typebot.variables,
       get: (id: string) => {
         const variable = session.state.typebotsQueue[0].typebot.variables.find(
@@ -121,7 +128,10 @@ export const getMessageStream = async ({ sessionId, messages }: Props) => {
             state: session.state,
             currentBlockId: session.state.currentBlockId,
           })
-        if (newSetVariableHistory.length > 0)
+        if (
+          newSetVariableHistory.length > 0 &&
+          session.state.typebotsQueue[0].resultId
+        )
           await saveSetVariableHistoryItems(newSetVariableHistory)
         await updateSession({
           id: session.id,
@@ -130,13 +140,15 @@ export const getMessageStream = async ({ sessionId, messages }: Props) => {
         })
       },
     }
-    const stream = await action.run.stream.run({
+    const { stream, httpError } = await action.run.stream.run({
       credentials: decryptedCredentials,
       options: deepParseVariables(
         session.state.typebotsQueue[0].typebot.variables
       )(block.options),
       variables,
     })
+    if (httpError) return httpError
+
     if (!stream) return { status: 500, message: 'Could not create stream' }
 
     return { stream }

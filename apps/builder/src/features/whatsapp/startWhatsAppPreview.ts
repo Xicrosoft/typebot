@@ -108,7 +108,6 @@ export const startWhatsAppPreview = authenticatedProcedure
       setVariableHistory,
     } = await startSession({
       version: 2,
-      message: undefined,
       startParams: {
         isOnlyRegistering: !canSendDirectMessagesToUser,
         type: 'preview',
@@ -116,6 +115,7 @@ export const startWhatsAppPreview = authenticatedProcedure
         startFrom,
         userId: user.id,
         isStreamEnabled: false,
+        textBubbleContentFormat: 'richText',
       },
       initialSessionState: {
         whatsApp: (existingSession?.state as SessionState | undefined)

@@ -11,15 +11,18 @@ import {
   getVariablesToParseInfoInText,
   parseVariables,
 } from '@typebot.io/variables/parseVariables'
-import { TDescendant } from '@udecode/plate-common'
+import { TDescendant, TElement } from '@udecode/plate-common'
 import { BubbleBlockType } from '@typebot.io/schemas/features/blocks/bubbles/constants'
 import { defaultVideoBubbleContent } from '@typebot.io/schemas/features/blocks/bubbles/video/constants'
 import { convertMarkdownToRichText } from '@typebot.io/lib/markdown/convertMarkdownToRichText'
+import { convertRichTextToMarkdown } from '@typebot.io/lib/markdown/convertRichTextToMarkdown'
+import { isSingleVariable } from '@typebot.io/variables/isSingleVariable'
 
 type Params = {
   version: 1 | 2
   typebotVersion: Typebot['version']
   variables: Variable[]
+  textBubbleContentFormat: 'richText' | 'markdown'
 }
 
 export type BubbleBlockWithDefinedContent = BubbleBlock & {
@@ -28,7 +31,7 @@ export type BubbleBlockWithDefinedContent = BubbleBlock & {
 
 export const parseBubbleBlock = (
   block: BubbleBlockWithDefinedContent,
-  { version, variables, typebotVersion }: Params
+  { version, variables, typebotVersion, textBubbleContentFormat }: Params
 ): ContinueChatResponse['messages'][0] => {
   switch (block.type) {
     case BubbleBlockType.TEXT: {
@@ -36,21 +39,29 @@ export const parseBubbleBlock = (
         return {
           ...block,
           content: {
-            ...block.content,
+            type: 'richText',
             richText: (block.content?.richText ?? []).map(
               deepParseVariables(variables)
             ),
           },
         }
+
+      const richText = parseVariablesInRichText(block.content?.richText ?? [], {
+        variables,
+        takeLatestIfList: typebotVersion !== '6',
+      }).parsedElements
       return {
         ...block,
-        content: {
-          ...block.content,
-          richText: parseVariablesInRichText(block.content?.richText ?? [], {
-            variables,
-            takeLatestIfList: typebotVersion !== '6',
-          }).parsedElements,
-        },
+        content:
+          textBubbleContentFormat === 'richText'
+            ? {
+                type: 'richText',
+                richText,
+              }
+            : {
+                type: 'markdown',
+                markdown: convertRichTextToMarkdown(richText as TElement[]),
+              },
       }
     }
 
@@ -134,7 +145,9 @@ export const parseVariablesInRichText = (
             : undefined
         lastTextEndIndex = variableInText.endIndex
         const isStandaloneElement =
-          isEmpty(textBeforeVariable) && isEmpty(textAfterVariable)
+          isEmpty(textBeforeVariable) &&
+          isEmpty(textAfterVariable) &&
+          variablesInText.length === 1
         const variableElements = convertMarkdownToRichText(
           isStandaloneElement
             ? variableInText.value
@@ -183,8 +196,7 @@ export const parseVariablesInRichText = (
     const type =
       element.children.length === 1 &&
       'text' in element.children[0] &&
-      (element.children[0].text as string).startsWith('{{') &&
-      (element.children[0].text as string).endsWith('}}') &&
+      isSingleVariable(element.children[0].text as string) &&
       element.type !== 'a'
         ? 'variable'
         : element.type

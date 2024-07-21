@@ -1,8 +1,7 @@
 import { safeStringify } from '@typebot.io/lib/safeStringify'
 import { isDefined, isNotDefined } from '@typebot.io/lib/utils'
-import { parseGuessedValueType } from './parseGuessedValueType'
 import { Variable, VariableWithValue } from './types'
-import vm from 'vm'
+import { createCodeRunner } from './codeRunners'
 
 export type ParseVariablesOptions = {
   fieldToParse?: 'value' | 'id'
@@ -73,18 +72,11 @@ const evaluateInlineCode = (
   code: string,
   { variables }: { variables: Variable[] }
 ) => {
-  const evaluating = parseVariables(variables, { fieldToParse: 'id' })(
-    `(function() {
-      ${code.includes('return ') ? code : 'return ' + code}
-    })()`
-  )
   try {
-    const sandbox = vm.createContext({
-      ...Object.fromEntries(
-        variables.map((v) => [v.id, parseGuessedValueType(v.value)])
-      ),
-    })
-    return vm.runInContext(evaluating, sandbox)
+    const body = parseVariables(variables, { fieldToParse: 'id' })(code)
+    return createCodeRunner({ variables })(
+      body.includes('return ') ? body : `return ${body}`
+    )
   } catch (err) {
     return parseVariables(variables)(code)
   }
@@ -135,7 +127,7 @@ export const getVariablesToParseInfoInText = (
     if (isNotDefined(match.index) || !match[0].length) return
     const matchedVarName = match[1] ?? match[3]
     const variable = variables.find((variable) => {
-      return matchedVarName === variable.name && isDefined(variable.value)
+      return matchedVarName === variable.name
     }) as VariableWithValue | undefined
     variablesToParseInfo.push({
       startIndex: match.index,
